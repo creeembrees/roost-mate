@@ -1,182 +1,147 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import { Heart, MapPin, DollarSign, Star } from "lucide-react";
+import { Heart, MapPin, Star, Loader2 } from "lucide-react";
 import { calculateCompatibilityScore, generateMatchTags, type SurveyAnswers } from "@/lib/compatibility";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
-// Mock current user's survey answers (will come from auth when backend is connected)
-const currentUserAnswers: SurveyAnswers = {
-  cleanliness_level: 5,
-  introvert_extrovert: 3,
-  sleep_schedule: 2,
-  noise_tolerance: 3,
-  food_preference: 4,
-  smoking_habits: 1,
-  pets_preference: 5,
-  guest_comfort: 3,
-  study_habits: 4,
-  budget_flexibility: 3,
-};
-
-// Mock data - will be replaced with real users from database
-const mockUsers = [
-  {
-    id: 1,
-    name: "Sarah Johnson",
-    age: 24,
-    city: "New York",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-    budget: "$800-1200",
-    surveyAnswers: {
-      cleanliness_level: 5,
-      introvert_extrovert: 3,
-      sleep_schedule: 2,
-      noise_tolerance: 3,
-      food_preference: 4,
-      smoking_habits: 1,
-      pets_preference: 5,
-      guest_comfort: 2,
-      study_habits: 4,
-      budget_flexibility: 3,
-    },
-  },
-  {
-    id: 2,
-    name: "Emily Chen",
-    age: 23,
-    city: "New York",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emily",
-    budget: "$900-1400",
-    surveyAnswers: {
-      cleanliness_level: 4,
-      introvert_extrovert: 4,
-      sleep_schedule: 4,
-      noise_tolerance: 4,
-      food_preference: 3,
-      smoking_habits: 2,
-      pets_preference: 3,
-      guest_comfort: 4,
-      study_habits: 3,
-      budget_flexibility: 4,
-    },
-  },
-  {
-    id: 3,
-    name: "Jessica Martinez",
-    age: 25,
-    city: "New York",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jessica",
-    budget: "$700-1000",
-    surveyAnswers: {
-      cleanliness_level: 4,
-      introvert_extrovert: 2,
-      sleep_schedule: 3,
-      noise_tolerance: 2,
-      food_preference: 4,
-      smoking_habits: 1,
-      pets_preference: 3,
-      guest_comfort: 2,
-      study_habits: 5,
-      budget_flexibility: 2,
-    },
-  },
-  {
-    id: 4,
-    name: "Ashley Williams",
-    age: 22,
-    city: "New York",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ashley",
-    budget: "$850-1300",
-    surveyAnswers: {
-      cleanliness_level: 3,
-      introvert_extrovert: 4,
-      sleep_schedule: 3,
-      noise_tolerance: 4,
-      food_preference: 5,
-      smoking_habits: 3,
-      pets_preference: 4,
-      guest_comfort: 4,
-      study_habits: 3,
-      budget_flexibility: 4,
-    },
-  },
-  {
-    id: 5,
-    name: "Amanda Brown",
-    age: 26,
-    city: "New York",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Amanda",
-    budget: "$750-1100",
-    surveyAnswers: {
-      cleanliness_level: 4,
-      introvert_extrovert: 3,
-      sleep_schedule: 2,
-      noise_tolerance: 3,
-      food_preference: 3,
-      smoking_habits: 1,
-      pets_preference: 2,
-      guest_comfort: 2,
-      study_habits: 3,
-      budget_flexibility: 3,
-    },
-  },
-  {
-    id: 6,
-    name: "Lauren Davis",
-    age: 24,
-    city: "New York",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Lauren",
-    budget: "$900-1500",
-    surveyAnswers: {
-      cleanliness_level: 5,
-      introvert_extrovert: 4,
-      sleep_schedule: 3,
-      noise_tolerance: 3,
-      food_preference: 2,
-      smoking_habits: 1,
-      pets_preference: 4,
-      guest_comfort: 4,
-      study_habits: 2,
-      budget_flexibility: 4,
-    },
-  },
-];
+interface UserMatch {
+  id: string;
+  name: string;
+  age: number;
+  city: string;
+  matchScore: number;
+  avatar: string;
+  tags: string[];
+  bio: string | null;
+}
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [sortBy, setSortBy] = useState<"score" | "newest" | "age">("score");
-  const [matches, setMatches] = useState<Array<{
-    id: number;
-    name: string;
-    age: number;
-    city: string;
-    matchScore: number;
-    avatar: string;
-    tags: string[];
-    budget: string;
-  }>>([]);
+  const [matches, setMatches] = useState<UserMatch[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUserAnswers, setCurrentUserAnswers] = useState<SurveyAnswers | null>(null);
 
-  // Calculate compatibility scores for all users
   useEffect(() => {
-    const calculatedMatches = mockUsers.map(user => ({
-      id: user.id,
-      name: user.name,
-      age: user.age,
-      city: user.city,
-      avatar: user.avatar,
-      budget: user.budget,
-      matchScore: calculateCompatibilityScore(currentUserAnswers, user.surveyAnswers),
-      tags: generateMatchTags(user.surveyAnswers),
-    }));
-    setMatches(calculatedMatches);
+    fetchMatches();
   }, []);
+
+  const fetchMatches = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      // Get current user's survey answers
+      const { data: userSurvey, error: surveyError } = await supabase
+        .from("survey_answers")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (surveyError) throw surveyError;
+
+      if (!userSurvey) {
+        toast({
+          title: "Complete your survey",
+          description: "Please complete the survey to see matches.",
+        });
+        navigate("/survey");
+        return;
+      }
+
+      setCurrentUserAnswers({
+        cleanliness_level: userSurvey.cleanliness_level,
+        introvert_extrovert: userSurvey.introvert_extrovert,
+        sleep_schedule: userSurvey.sleep_schedule,
+        noise_tolerance: userSurvey.noise_tolerance,
+        food_preference: userSurvey.food_preference,
+        smoking_habits: userSurvey.smoking_habits,
+        pets_preference: userSurvey.pets_preference,
+        guest_comfort: userSurvey.guest_comfort,
+        study_habits: userSurvey.study_habits,
+        budget_flexibility: userSurvey.budget_flexibility,
+      });
+
+      // Fetch all other users who have completed both profile and survey
+      const { data: otherUsers, error: usersError } = await supabase
+        .from("profiles")
+        .select(`
+          *,
+          survey_answers (*)
+        `)
+        .neq("id", user.id);
+
+      if (usersError) throw usersError;
+
+      // Filter out users without survey answers and calculate compatibility
+      const calculatedMatches: UserMatch[] = (otherUsers || [])
+        .filter((profile: any) => profile.survey_answers && profile.survey_answers.length > 0)
+        .map((profile: any) => {
+          const surveyAnswers: any = profile.survey_answers[0];
+          const answers: SurveyAnswers = {
+            cleanliness_level: surveyAnswers.cleanliness_level,
+            introvert_extrovert: surveyAnswers.introvert_extrovert,
+            sleep_schedule: surveyAnswers.sleep_schedule,
+            noise_tolerance: surveyAnswers.noise_tolerance,
+            food_preference: surveyAnswers.food_preference,
+            smoking_habits: surveyAnswers.smoking_habits,
+            pets_preference: surveyAnswers.pets_preference,
+            guest_comfort: surveyAnswers.guest_comfort,
+            study_habits: surveyAnswers.study_habits,
+            budget_flexibility: surveyAnswers.budget_flexibility,
+          };
+
+          return {
+            id: profile.id,
+            name: profile.full_name || "Anonymous",
+            age: profile.age || 0,
+            city: profile.city,
+            avatar: profile.profile_photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
+            bio: profile.bio,
+            matchScore: calculateCompatibilityScore(
+              {
+                cleanliness_level: userSurvey.cleanliness_level,
+                introvert_extrovert: userSurvey.introvert_extrovert,
+                sleep_schedule: userSurvey.sleep_schedule,
+                noise_tolerance: userSurvey.noise_tolerance,
+                food_preference: userSurvey.food_preference,
+                smoking_habits: userSurvey.smoking_habits,
+                pets_preference: userSurvey.pets_preference,
+                guest_comfort: userSurvey.guest_comfort,
+                study_habits: userSurvey.study_habits,
+                budget_flexibility: userSurvey.budget_flexibility,
+              },
+              answers
+            ),
+            tags: generateMatchTags(answers),
+          };
+        });
+
+      setMatches(calculatedMatches);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const sortedMatches = [...matches].sort((a, b) => {
     if (sortBy === "score") return b.matchScore - a.matchScore;
     if (sortBy === "age") return a.age - b.age;
-    return 0; // newest - will use created_at when we have real data
+    return 0; // newest - would use created_at if available
   });
 
   const getMatchColor = (score: number) => {
@@ -228,8 +193,12 @@ const Dashboard = () => {
             </Button>
           </div>
 
-          {/* Matches Grid */}
-          {matches.length === 0 ? (
+          {/* Loading State */}
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : matches.length === 0 ? (
             <Card className="p-12 text-center animate-fade-in">
               <h3 className="text-2xl font-semibold mb-4">No compatible users found</h3>
               <p className="text-muted-foreground mb-6">
@@ -275,16 +244,15 @@ const Dashboard = () => {
                       ))}
                     </div>
 
-                    {/* Location & Budget */}
+                    {/* Location & Bio */}
                     <div className="space-y-2 pt-2 border-t border-border/50">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <MapPin className="w-4 h-4" />
                         <span>{match.city}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <DollarSign className="w-4 h-4" />
-                        <span>{match.budget}</span>
-                      </div>
+                      {match.bio && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{match.bio}</p>
+                      )}
                     </div>
 
                     {/* CTA Button */}

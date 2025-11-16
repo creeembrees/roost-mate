@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import { supabase } from "@/integrations/supabase/client";
 
 const Survey = () => {
   const navigate = useNavigate();
@@ -153,29 +154,51 @@ const Survey = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate all fields are filled
-    const allFieldsFilled = Object.values(formData).every((val) => val !== "");
+    const allFieldsFilled = Object.values(formData).every((value) => value !== "");
     if (!allFieldsFilled) {
       toast({
-        title: "Incomplete Form",
+        title: "Incomplete survey",
         description: "Please answer all questions before submitting.",
         variant: "destructive",
       });
       return;
     }
 
-    // TODO: Add user authentication check here
-    // TODO: Save to Supabase when backend is connected
-    
-    toast({
-      title: "Survey Submitted!",
-      description: "Finding your perfect roommate matches...",
-    });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
 
-    // Redirect to dashboard
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1000);
+      const surveyData = {
+        user_id: user.id,
+        cleanliness_level: parseInt(formData.cleanliness_level),
+        introvert_extrovert: parseInt(formData.introvert_extrovert),
+        sleep_schedule: parseInt(formData.sleep_schedule),
+        noise_tolerance: parseInt(formData.noise_tolerance),
+        food_preference: parseInt(formData.food_preference),
+        smoking_habits: parseInt(formData.smoking_habits),
+        pets_preference: parseInt(formData.pets_preference),
+        guest_comfort: parseInt(formData.guest_comfort),
+        study_habits: parseInt(formData.study_habits),
+        budget_flexibility: parseInt(formData.budget_flexibility),
+      };
+
+      const { error } = await supabase.from("survey_answers").upsert(surveyData);
+
+      if (error) throw error;
+
+      toast({
+        title: "Survey completed!",
+        description: "Finding your perfect roommate matches...",
+      });
+
+      setTimeout(() => navigate("/dashboard"), 1500);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
