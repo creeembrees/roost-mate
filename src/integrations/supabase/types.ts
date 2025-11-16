@@ -14,7 +14,96 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          age: number | null
+          bio: string | null
+          city: string
+          college_workplace: string | null
+          created_at: string
+          full_name: string | null
+          gender: string | null
+          id: string
+          profile_photo_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          age?: number | null
+          bio?: string | null
+          city: string
+          college_workplace?: string | null
+          created_at?: string
+          full_name?: string | null
+          gender?: string | null
+          id: string
+          profile_photo_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          age?: number | null
+          bio?: string | null
+          city?: string
+          college_workplace?: string | null
+          created_at?: string
+          full_name?: string | null
+          gender?: string | null
+          id?: string
+          profile_photo_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      survey_answers: {
+        Row: {
+          budget_flexibility: number
+          cleanliness_level: number
+          created_at: string
+          food_preference: number
+          guest_comfort: number
+          id: string
+          introvert_extrovert: number
+          noise_tolerance: number
+          pets_preference: number
+          sleep_schedule: number
+          smoking_habits: number
+          study_habits: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_flexibility: number
+          cleanliness_level: number
+          created_at?: string
+          food_preference: number
+          guest_comfort: number
+          id?: string
+          introvert_extrovert: number
+          noise_tolerance: number
+          pets_preference: number
+          sleep_schedule: number
+          smoking_habits: number
+          study_habits: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_flexibility?: number
+          cleanliness_level?: number
+          created_at?: string
+          food_preference?: number
+          guest_comfort?: number
+          id?: string
+          introvert_extrovert?: number
+          noise_tolerance?: number
+          pets_preference?: number
+          sleep_schedule?: number
+          smoking_habits?: number
+          study_habits?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
