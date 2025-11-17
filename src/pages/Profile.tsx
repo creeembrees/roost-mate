@@ -29,6 +29,17 @@ const Profile = () => {
     checkExistingProfile();
   }, []);
 
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
   const checkExistingProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {

@@ -27,18 +27,44 @@ const Dashboard = () => {
   const [matches, setMatches] = useState<UserMatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserAnswers, setCurrentUserAnswers] = useState<SurveyAnswers | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    fetchMatches();
-  }, []);
-
-  const fetchMatches = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         navigate("/auth");
         return;
       }
+      setCurrentUser(session.user);
+      await fetchMatches();
+    };
+    initAuth();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/auth");
+      } else {
+        setCurrentUser(session.user);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const fetchMatches = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        navigate("/auth");
+        return;
+      }
+      
+      const user = session.user;
 
       // Get current user's survey answers
       const { data: userSurvey, error: surveyError } = await supabase
