@@ -26,16 +26,25 @@ const Profile = () => {
   });
 
   useEffect(() => {
-    checkExistingProfile();
-  }, []);
-
-  useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session) {
+    const initAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         navigate("/auth");
+        return;
       }
-    });
+      checkExistingProfile();
+    };
+    
+    initAuth();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT") {
+          navigate("/auth");
+        }
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, [navigate]);

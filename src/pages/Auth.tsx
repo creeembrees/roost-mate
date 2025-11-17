@@ -25,6 +25,17 @@ const Auth = () => {
       }
     };
     checkAuth();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session) {
+          await redirectUser(session.user.id);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const redirectUser = async (userId: string) => {
@@ -85,6 +96,9 @@ const Auth = () => {
 
     try {
       if (isLogin) {
+        // Clear any existing session before login
+        await supabase.auth.signOut();
+        
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
