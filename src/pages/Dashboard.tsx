@@ -30,25 +30,29 @@ const Dashboard = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
+    // Initialize authentication
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         navigate("/auth");
         return;
       }
-      setCurrentUser(session.user);
+      setCurrentUser(user);
       await fetchMatches();
     };
+
     initAuth();
 
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session) {
-        navigate("/auth");
-      } else {
-        setCurrentUser(session.user);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT") {
+          navigate("/auth");
+        } else if (session) {
+          setCurrentUser(session.user);
+        }
       }
-    });
+    );
 
     return () => subscription.unsubscribe();
   }, [navigate]);

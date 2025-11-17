@@ -1,10 +1,43 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check current user
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkUser();
+
+    // Listen to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      toast.success("Signed out successfully");
+      navigate("/auth");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to sign out");
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
@@ -40,12 +73,31 @@ const Navigation = () => {
               FAQs
             </Link>
             <div className="flex items-center gap-4">
-              <Link to="/auth">
-                <Button variant="outline">Sign In</Button>
-              </Link>
-              <Link to="/survey">
-                <Button className="bg-gradient-ocean hover:opacity-90">Take Survey</Button>
-              </Link>
+              {user ? (
+                <>
+                  <span className="text-sm text-muted-foreground">{user.email}</span>
+                  <Link to="/dashboard">
+                    <Button variant="outline">Dashboard</Button>
+                  </Link>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleLogout}
+                    className="flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth">
+                    <Button variant="outline">Sign In</Button>
+                  </Link>
+                  <Link to="/survey">
+                    <Button className="bg-gradient-ocean hover:opacity-90">Take Survey</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 
@@ -84,14 +136,40 @@ const Navigation = () => {
               FAQs
             </Link>
             <div className="space-y-2 pt-4">
-              <Link to="/auth" onClick={() => setIsOpen(false)}>
-                <Button variant="outline" className="w-full">
-                  Sign In
-                </Button>
-              </Link>
-              <Link to="/survey" onClick={() => setIsOpen(false)}>
-                <Button className="w-full bg-gradient-ocean">Take Survey</Button>
-              </Link>
+              {user ? (
+                <>
+                  <div className="text-sm text-muted-foreground px-4 py-2">
+                    {user.email}
+                  </div>
+                  <Link to="/dashboard" onClick={() => setIsOpen(false)}>
+                    <Button variant="outline" className="w-full">
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="outline" 
+                    className="w-full flex items-center justify-center gap-2"
+                    onClick={() => {
+                      handleLogout();
+                      setIsOpen(false);
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth" onClick={() => setIsOpen(false)}>
+                    <Button variant="outline" className="w-full">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/survey" onClick={() => setIsOpen(false)}>
+                    <Button className="w-full bg-gradient-ocean">Take Survey</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
