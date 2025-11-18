@@ -101,12 +101,12 @@ const Dashboard = () => {
         budget_flexibility: userSurvey.budget_flexibility,
       });
 
-      // Fetch all other users' surveys with their profiles
+      // Fetch all other users' surveys with their profiles using named foreign key
       const { data: otherSurveys, error: surveysError } = await supabase
         .from("survey_answers")
         .select(`
           *,
-          profiles (*)
+          profiles!survey_answers_user_id_fkey (*)
         `)
         .neq("user_id", user.id);
 
