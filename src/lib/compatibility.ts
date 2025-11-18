@@ -28,18 +28,40 @@ export const FIELD_WEIGHTS = {
 } as const;
 
 /**
- * Calculate similarity between two values on a 1-5 scale
- * @param value1 First user's answer (1-5)
- * @param value2 Second user's answer (1-5)
- * @returns Similarity percentage (0-1)
+ * Calculate cosine similarity between two vectors
+ * @param a First vector
+ * @param b Second vector
+ * @returns Similarity score (0-1)
  */
-function calculateFieldSimilarity(value1: number, value2: number): number {
-  const difference = Math.abs(value1 - value2);
-  return (5 - difference) / 5;
+function cosineSimilarity(a: number[], b: number[]): number {
+  const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
+  const magA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+  const magB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+  return dot / (magA * magB);
 }
 
 /**
- * Calculate compatibility score between two users
+ * Convert survey answers to vector
+ * @param answers Survey answers
+ * @returns Vector of answer values
+ */
+function answersToVector(answers: SurveyAnswers): number[] {
+  return [
+    answers.cleanliness_level,
+    answers.introvert_extrovert,
+    answers.sleep_schedule,
+    answers.noise_tolerance,
+    answers.food_preference,
+    answers.smoking_habits,
+    answers.pets_preference,
+    answers.guest_comfort,
+    answers.study_habits,
+    answers.budget_flexibility,
+  ];
+}
+
+/**
+ * Calculate compatibility score between two users using cosine similarity
  * @param user1Answers First user's survey answers
  * @param user2Answers Second user's survey answers
  * @returns Compatibility score (0-100)
@@ -48,20 +70,11 @@ export function calculateCompatibilityScore(
   user1Answers: SurveyAnswers,
   user2Answers: SurveyAnswers
 ): number {
-  let totalScore = 0;
-
-  // Calculate weighted similarity for each field
-  (Object.keys(FIELD_WEIGHTS) as Array<keyof SurveyAnswers>).forEach((field) => {
-    const similarity = calculateFieldSimilarity(
-      user1Answers[field],
-      user2Answers[field]
-    );
-    const weightedSimilarity = similarity * FIELD_WEIGHTS[field];
-    totalScore += weightedSimilarity;
-  });
-
-  // Convert to 0-100 scale
-  return Math.round(totalScore * 100);
+  const vector1 = answersToVector(user1Answers);
+  const vector2 = answersToVector(user2Answers);
+  
+  const similarity = cosineSimilarity(vector1, vector2);
+  return Math.round(similarity * 100);
 }
 
 /**
