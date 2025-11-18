@@ -101,57 +101,69 @@ const Dashboard = () => {
         budget_flexibility: userSurvey.budget_flexibility,
       });
 
-      // Fetch all other users who have completed both profile and survey
-      const { data: otherUsers, error: usersError } = await supabase
-        .from("profiles")
+      // Fetch all other users' surveys with their profiles
+      const { data: otherSurveys, error: surveysError } = await supabase
+        .from("survey_answers")
         .select(`
           *,
-          survey_answers (*)
+          profiles (*)
         `)
-        .neq("id", user.id);
+        .neq("user_id", user.id);
 
-      if (usersError) throw usersError;
+      if (surveysError) throw surveysError;
 
-      // Filter out users without survey answers and calculate compatibility
-      const calculatedMatches: UserMatch[] = (otherUsers || [])
-        .filter((profile: any) => profile.survey_answers && profile.survey_answers.length > 0)
-        .map((profile: any) => {
-          const surveyAnswers: any = profile.survey_answers[0];
+      // Calculate compatibility for all users with surveys
+      const calculatedMatches: UserMatch[] = (otherSurveys || [])
+        .filter((survey: any) => {
+          // Ensure profile exists and all required survey fields are present
+          if (!survey.profiles) return false;
+          
+          const requiredFields = [
+            'cleanliness_level', 'introvert_extrovert', 'sleep_schedule',
+            'noise_tolerance', 'food_preference', 'smoking_habits',
+            'pets_preference', 'guest_comfort', 'study_habits', 'budget_flexibility'
+          ];
+          
+          return requiredFields.every(field => 
+            typeof survey[field] === 'number' && survey[field] >= 1 && survey[field] <= 5
+          );
+        })
+        .map((survey: any) => {
+          const profile = survey.profiles;
           const answers: SurveyAnswers = {
-            cleanliness_level: surveyAnswers.cleanliness_level,
-            introvert_extrovert: surveyAnswers.introvert_extrovert,
-            sleep_schedule: surveyAnswers.sleep_schedule,
-            noise_tolerance: surveyAnswers.noise_tolerance,
-            food_preference: surveyAnswers.food_preference,
-            smoking_habits: surveyAnswers.smoking_habits,
-            pets_preference: surveyAnswers.pets_preference,
-            guest_comfort: surveyAnswers.guest_comfort,
-            study_habits: surveyAnswers.study_habits,
-            budget_flexibility: surveyAnswers.budget_flexibility,
+            cleanliness_level: survey.cleanliness_level,
+            introvert_extrovert: survey.introvert_extrovert,
+            sleep_schedule: survey.sleep_schedule,
+            noise_tolerance: survey.noise_tolerance,
+            food_preference: survey.food_preference,
+            smoking_habits: survey.smoking_habits,
+            pets_preference: survey.pets_preference,
+            guest_comfort: survey.guest_comfort,
+            study_habits: survey.study_habits,
+            budget_flexibility: survey.budget_flexibility,
+          };
+
+          const currentAnswers: SurveyAnswers = {
+            cleanliness_level: userSurvey.cleanliness_level,
+            introvert_extrovert: userSurvey.introvert_extrovert,
+            sleep_schedule: userSurvey.sleep_schedule,
+            noise_tolerance: userSurvey.noise_tolerance,
+            food_preference: userSurvey.food_preference,
+            smoking_habits: userSurvey.smoking_habits,
+            pets_preference: userSurvey.pets_preference,
+            guest_comfort: userSurvey.guest_comfort,
+            study_habits: userSurvey.study_habits,
+            budget_flexibility: userSurvey.budget_flexibility,
           };
 
           return {
             id: profile.id,
             name: profile.full_name || "Anonymous",
             age: profile.age || 0,
-            city: profile.city,
+            city: profile.city || "Unknown",
             avatar: profile.profile_photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
             bio: profile.bio,
-            matchScore: calculateCompatibilityScore(
-              {
-                cleanliness_level: userSurvey.cleanliness_level,
-                introvert_extrovert: userSurvey.introvert_extrovert,
-                sleep_schedule: userSurvey.sleep_schedule,
-                noise_tolerance: userSurvey.noise_tolerance,
-                food_preference: userSurvey.food_preference,
-                smoking_habits: userSurvey.smoking_habits,
-                pets_preference: userSurvey.pets_preference,
-                guest_comfort: userSurvey.guest_comfort,
-                study_habits: userSurvey.study_habits,
-                budget_flexibility: userSurvey.budget_flexibility,
-              },
-              answers
-            ),
+            matchScore: calculateCompatibilityScore(currentAnswers, answers),
             tags: generateMatchTags(answers),
           };
         });
